@@ -55,7 +55,7 @@ namespace XmlDocConvert
         }
     }
 
-    sealed class NameComparer : IComparer<string>
+    sealed class LexicographicalNameComparer : IComparer<string>
     {
         private static int CompareChars(char c1, char c2)
         {
@@ -127,12 +127,17 @@ namespace XmlDocConvert
 
         private readonly Func<string> input;
         private readonly Action<string> output;
-        private readonly IComparer<string> nameComparer = StringComparer.InvariantCulture;
+        private readonly IComparer<string> nameComparer;
 
-        public XmlDocConverter(Func<string> input, Action<string> output)
+        public XmlDocConverter(Func<string> input, Action<string> output, IComparer<string> nameComparer)
         {
             this.input = input ?? Console.ReadLine;
             this.output = output ?? Console.WriteLine;
+            this.nameComparer = nameComparer ?? StringComparer.InvariantCulture;
+        }
+
+        public XmlDocConverter(): this(null, null, null)
+        {
         }
 
         public IList<Project> ReadProjects()
@@ -249,7 +254,7 @@ namespace XmlDocConvert
     {
         static void Main(string[] args)
         {
-            XmlDocConverter converter = new XmlDocConverter(null, null);
+            XmlDocConverter converter = new XmlDocConverter(null, null, new LexicographicalNameComparer());
             IList<Project> inputProjects = converter.ReadProjects();
 
             IList<Member> members = converter.Convert(inputProjects);
