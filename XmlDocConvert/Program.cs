@@ -55,26 +55,29 @@ namespace XmlDocConvert
         }
     }
 
-    static class InputConsts
-    {
-        public const string ProjectsHeader = "<projects>";
-        public const string ProjectsTail = "</projects>";
-
-        public const string ProjectHeaderStart = "    <project name=\"";
-        public const string ProjectHeaderEnd = "\">";
-        public static readonly int ProjectHeaderMinLength = ProjectHeaderStart.Length + ProjectHeaderEnd.Length;
-        public const string ProjectTail = "    </project>";
-
-        public const string ProjectMemberStart = "        <member role=\"";
-        public const string ProjectMemberEnd = "\"/>";
-        public const string ProjectMemberNameStart = "\" name=\"";
-        public static readonly int ProjectMemberMinLength = ProjectMemberStart.Length + ProjectMemberNameStart.Length + ProjectMemberEnd.Length;
-
-        static InputConsts() { }
-    }
-
     sealed class XmlDocConverter
     {
+        private static class ProjectConsts
+        {
+            public const string ProjectsHeader = "<projects>";
+            public const string ProjectsTail = "</projects>";
+
+            public const string ProjectHeaderStart = "    <project name=\"";
+            public const string ProjectHeaderEnd = "\">";
+            public static readonly int ProjectHeaderMinLength = ProjectHeaderStart.Length + ProjectHeaderEnd.Length;
+            public const string ProjectHeaderTemplate = ProjectHeaderStart + "{0}" + ProjectHeaderEnd;
+            public const string ProjectTail = "    </project>";
+
+            public const string ProjectMemberStart = "        <member role=\"";
+            public const string ProjectMemberEnd = "\"/>";
+            public const string ProjectMemberNameStart = "\" name=\"";
+            public const string ProjectMemberNameTemplate = ProjectMemberStart + "{0}" + ProjectMemberNameStart + "{1}" + ProjectMemberEnd;
+
+            public static readonly int ProjectMemberMinLength = ProjectMemberStart.Length + ProjectMemberNameStart.Length + ProjectMemberEnd.Length;
+
+            static ProjectConsts() { }
+        }
+
         private readonly Func<string> input;
         private readonly Action<string> output;
 
@@ -86,48 +89,45 @@ namespace XmlDocConvert
 
         public IList<Project> ReadProjects()
         {
-            if (this.input() != InputConsts.ProjectsHeader)
+            if (this.input() != ProjectConsts.ProjectsHeader)
                 throw new ArgumentException("Projects header was expected.");
 
             List<Project> inputProjects = new List<Project>();
             string projectHeader;
-            while ((projectHeader = this.input()) != InputConsts.ProjectsTail)
+            while ((projectHeader = this.input()) != ProjectConsts.ProjectsTail)
             {
                 if (!(
-                    projectHeader.Length >= InputConsts.ProjectHeaderMinLength &&
-                    projectHeader.StartsWith(InputConsts.ProjectHeaderStart, StringComparison.Ordinal) &&
-                    projectHeader.EndsWith(InputConsts.ProjectHeaderEnd, StringComparison.Ordinal)
+                    projectHeader.Length >= ProjectConsts.ProjectHeaderMinLength &&
+                    projectHeader.StartsWith(ProjectConsts.ProjectHeaderStart, StringComparison.Ordinal) &&
+                    projectHeader.EndsWith(ProjectConsts.ProjectHeaderEnd, StringComparison.Ordinal)
                 ))
                     throw new ArgumentException("Project header is incorrect.");
 
                 string projectName = projectHeader.Substring(
-                    InputConsts.ProjectHeaderStart.Length,
-                    projectHeader.Length - (InputConsts.ProjectHeaderStart.Length + InputConsts.ProjectHeaderEnd.Length)
+                    ProjectConsts.ProjectHeaderStart.Length,
+                    projectHeader.Length - (ProjectConsts.ProjectHeaderStart.Length + ProjectConsts.ProjectHeaderEnd.Length)
                 );
 
                 List<ProjectMember> projectMembers = new List<ProjectMember>();
                 string memberLine;
-                while ((memberLine = this.input()) != InputConsts.ProjectTail)
+                while ((memberLine = this.input()) != ProjectConsts.ProjectTail)
                 {
                     if (!(
-                        memberLine.Length >= InputConsts.ProjectMemberMinLength &&
-                        memberLine.StartsWith(InputConsts.ProjectMemberStart, StringComparison.Ordinal) &&
-                        memberLine.EndsWith(InputConsts.ProjectMemberEnd, StringComparison.Ordinal) &&
-                        memberLine.Contains(InputConsts.ProjectMemberNameStart)
+                        memberLine.Length >= ProjectConsts.ProjectMemberMinLength &&
+                        memberLine.StartsWith(ProjectConsts.ProjectMemberStart, StringComparison.Ordinal) &&
+                        memberLine.EndsWith(ProjectConsts.ProjectMemberEnd, StringComparison.Ordinal) &&
+                        memberLine.Contains(ProjectConsts.ProjectMemberNameStart)
                     ))
                         throw new ArgumentException("Member header is incorrect.");
 
-                    int indexOfProjectMemberNameStart = memberLine.IndexOf(InputConsts.ProjectMemberNameStart, StringComparison.Ordinal);
+                    int indexOfProjectMemberNameStart = memberLine.IndexOf(ProjectConsts.ProjectMemberNameStart, StringComparison.Ordinal);
+                    int memberRoleLength = indexOfProjectMemberNameStart - ProjectConsts.ProjectMemberStart.Length;
+                    string memberRole = memberLine.Substring(ProjectConsts.ProjectMemberStart.Length, memberRoleLength);
 
-                    string memberRole = memberLine.Substring(
-                        InputConsts.ProjectMemberStart.Length,
-                        memberLine.Length - (indexOfProjectMemberNameStart + InputConsts.ProjectMemberNameStart.Length) + 1
-                    );
-
-                    string memberName = memberLine.Substring(
-                        indexOfProjectMemberNameStart + InputConsts.ProjectMemberNameStart.Length,
-                        memberLine.Length - (indexOfProjectMemberNameStart + InputConsts.ProjectMemberNameStart.Length + InputConsts.ProjectMemberEnd.Length)
-                    );
+                    int indexOfProjectMemberEnd = memberLine.IndexOf(ProjectConsts.ProjectMemberEnd, StringComparison.Ordinal);
+                    int indexOfProjectMemberName = ProjectConsts.ProjectMemberStart.Length + memberRole.Length + ProjectConsts.ProjectMemberNameStart.Length;
+                    int memberNameLength = indexOfProjectMemberEnd - indexOfProjectMemberName;
+                    string memberName = memberLine.Substring(indexOfProjectMemberName, memberNameLength);
 
                     projectMembers.Add(new ProjectMember(memberRole, memberName));
                 } // while (member list)
@@ -140,26 +140,23 @@ namespace XmlDocConvert
 
         public void WriteProjects(IList<Project> projects)
         {
-            this.output(InputConsts.ProjectsHeader);
+            this.output(ProjectConsts.ProjectsHeader);
 
             for (int i = 0; i < projects.Count; i++)
             {
-                this.output(InputConsts.ProjectHeaderStart + projects[i].Name + InputConsts.ProjectHeaderEnd);
+                this.output(string.Format(CultureInfo.InvariantCulture, ProjectConsts.ProjectHeaderTemplate, projects[i].Name));
                 for (int j = 0; j < projects[i].Members.Count; j++)
-                {
-                    this.output(
-                        InputConsts.ProjectMemberStart +
-                        projects[i].Members[j].Role +
-                        InputConsts.ProjectMemberNameStart +
-                        projects[i].Members[j].Name +
-                        InputConsts.ProjectMemberEnd
-                    );
-                }
-                this.output(InputConsts.ProjectTail);
+                    this.output(string.Format(CultureInfo.InvariantCulture, ProjectConsts.ProjectMemberNameTemplate, projects[i].Members[j].Role, projects[i].Members[j].Name));
+                this.output(ProjectConsts.ProjectTail);
             }
 
-            this.output(InputConsts.ProjectsTail);
+            this.output(ProjectConsts.ProjectsTail);
         }
+
+        //public IList<Member> Convert(IList<Project> projects)
+        //{
+
+        //}
     }
 
     static class Program
@@ -169,7 +166,7 @@ namespace XmlDocConvert
             XmlDocConverter converter = new XmlDocConverter(null, null);
             IList<Project> inputProjects = converter.ReadProjects();
 
-            //converter.WriteProjects(inputProjects);
+            converter.WriteProjects(inputProjects);
             //Console.ReadLine();
         }
     }
