@@ -71,7 +71,7 @@ namespace XmlDocConvert
             if (c1 == c2)
                 return 0;
 
-            return -1;
+            return 1;
         }
 
         public int Compare(string x, string y)
@@ -208,10 +208,22 @@ namespace XmlDocConvert
 
         private IEnumerable<Member> ConvertInternal(IList<Project> projects)
         {
-            var memberNames = projects.SelectMany(project => project.Members.Select(member => member.Name)).Distinct();
+            IEnumerable<string> memberNames = projects.SelectMany(project => project.Members.Select(member => member.Name)).Distinct();
             foreach (string memberName in memberNames)
             {
-                yield return new Member(memberName, null);
+                IEnumerable<Project> memberProjects = projects.Where(project => project.Members.FirstOrDefault(member => member.Name == memberName) != null);
+                List<MemberRole> memberRoles = new List<MemberRole>();
+                foreach (Project project in memberProjects)
+                    foreach (ProjectMember projectMember in project.Members.Where(projectMember => projectMember.Name == memberName))
+                    {
+                        MemberRole memberRole = new MemberRole(projectMember.Role, project.Name);
+                        memberRoles.Add(memberRole);
+                    }
+                memberRoles = memberRoles
+                    .OrderBy(memberRole => memberRole.Name, this.nameComparer)
+                    .ThenBy(memberRole => memberRole.Project, this.nameComparer)
+                    .ToList();
+                yield return new Member(memberName, memberRoles);
             }
         }
 
@@ -260,7 +272,7 @@ namespace XmlDocConvert
             IList<Member> members = converter.Convert(inputProjects);
             converter.WriteMembers(members);
 
-            Console.ReadLine();
+            //Console.ReadLine();
         }
     }
 
