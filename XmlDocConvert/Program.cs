@@ -55,6 +55,53 @@ namespace XmlDocConvert
         }
     }
 
+    sealed class NameComparer : IComparer<string>
+    {
+        private static int CompareChars(char c1, char c2)
+        {
+            if (char.IsUpper(c1) && char.IsLower(c2))
+                return -1;
+
+            if (char.IsLower(c1) && char.IsUpper(c2))
+                return 1;
+
+            if (c1 < c2)
+                return -1;
+
+            if (c1 == c2)
+                return 0;
+
+            return -1;
+        }
+
+        public int Compare(string x, string y)
+        {
+            if ((object)x == (object)y)
+                return 0;
+
+            if ((object)x == null)
+                return -1;
+
+            if ((object)y == null)
+                return 1;
+
+            for (int i = 0; i < Math.Min(x.Length, y.Length); i++)
+            {
+                int result = CompareChars(x[i], y[i]);
+                if (result != 0)
+                    return result;
+            }
+
+            if (x.Length < y.Length)
+                return -1;
+
+            if (x.Length == y.Length)
+                return 0;
+
+            return 1;
+        }
+    }
+
     sealed class XmlDocConverter
     {
         private static class ProjectConsts
@@ -80,7 +127,7 @@ namespace XmlDocConvert
 
         private readonly Func<string> input;
         private readonly Action<string> output;
-        private readonly StringComparer nameComparer = StringComparer.InvariantCulture;
+        private readonly IComparer<string> nameComparer = StringComparer.InvariantCulture;
 
         public XmlDocConverter(Func<string> input, Action<string> output)
         {
@@ -163,9 +210,14 @@ namespace XmlDocConvert
             }
         }
 
+        private IOrderedEnumerable<Member> ConvertOrderedInternal(IList<Project> projects)
+        {
+            return this.ConvertInternal(projects).OrderBy(member => member.Name, this.nameComparer);
+        }
+
         public IList<Member> Convert(IList<Project> projects)
         {
-            return this.ConvertInternal(projects).OrderBy(member => member.Name, this.nameComparer).ToList();
+            return this.ConvertOrderedInternal(projects).ToList();
         }
 
         public void WriteMembers(IList<Member> members)
