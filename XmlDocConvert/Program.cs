@@ -80,6 +80,7 @@ namespace XmlDocConvert
 
         private readonly Func<string> input;
         private readonly Action<string> output;
+        private readonly StringComparer nameComparer = StringComparer.InvariantCulture;
 
         public XmlDocConverter(Func<string> input, Action<string> output)
         {
@@ -153,10 +154,43 @@ namespace XmlDocConvert
             this.output(ProjectConsts.ProjectsTail);
         }
 
-        //public IList<Member> Convert(IList<Project> projects)
-        //{
+        private IEnumerable<Member> ConvertInternal(IList<Project> projects)
+        {
+            var memberNames = projects.SelectMany(project => project.Members.Select(member => member.Name)).Distinct();
+            foreach (string memberName in memberNames)
+            {
+                yield return new Member(memberName, null);
+            }
+        }
 
-        //}
+        public IList<Member> Convert(IList<Project> projects)
+        {
+            return this.ConvertInternal(projects).OrderBy(member => member.Name, this.nameComparer).ToList();
+        }
+
+        public void WriteMembers(IList<Member> members)
+        {
+            this.output("<members>");
+            for (int i = 0; i < members.Count; i++)
+            {
+                this.output(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "    <member name=\"{0}\"/>",
+                    members[i].Name
+                ));
+                for (int j = 0; j < members[i].Roles.Count; j++)
+                {
+                    this.output(string.Format(
+                        CultureInfo.InvariantCulture,
+                        "        <role name=\"{0}\" project=\"{1}\"/>",
+                        members[i].Roles[j].Name,
+                        members[i].Roles[j].Project
+                    ));
+                }
+                this.output("    </member>");
+            }
+            this.output("</members>");
+        }
     }
 
     static class Program
@@ -166,8 +200,10 @@ namespace XmlDocConvert
             XmlDocConverter converter = new XmlDocConverter(null, null);
             IList<Project> inputProjects = converter.ReadProjects();
 
-            converter.WriteProjects(inputProjects);
-            //Console.ReadLine();
+            IList<Member> members = converter.Convert(inputProjects);
+            converter.WriteMembers(members);
+
+            Console.ReadLine();
         }
     }
 
