@@ -7,51 +7,51 @@ using System.Linq;
 namespace XmlDocConvert
 {
 
-    sealed class InputProjectMember
+    sealed class ProjectMember
     {
         public string Role { get; private set; }
         public string Name { get; private set; }
-        public InputProjectMember(string role, string name)
+        public ProjectMember(string role, string name)
         {
             this.Role = role ?? string.Empty;
             this.Name = name ?? string.Empty;
         }
     }
 
-    sealed class InputProject
+    sealed class Project
     {
         public string Name { get; private set; }
-        public ReadOnlyCollection<InputProjectMember> Members { get; private set; }
-        public InputProject(string name, IList<InputProjectMember> members)
+        public ReadOnlyCollection<ProjectMember> Members { get; private set; }
+        public Project(string name, IList<ProjectMember> members)
         {
             if ((object)members != null && members.Contains(null))
                 throw new ArgumentException("Member list must contains all not null values.", "members");
             this.Name = name ?? string.Empty;
-            this.Members = new ReadOnlyCollection<InputProjectMember>(members ?? new InputProjectMember[0]);
+            this.Members = new ReadOnlyCollection<ProjectMember>(members ?? new ProjectMember[0]);
         }
     }
 
-    sealed class OutputMemberRole
+    sealed class MemberRole
     {
         public string Name { get; private set; }
         public string Project { get; private set; }
-        public OutputMemberRole(string name, string project)
+        public MemberRole(string name, string project)
         {
             this.Name = name ?? string.Empty;
             this.Project = project ?? string.Empty;
         }
     }
 
-    sealed class OutputMember
+    sealed class Member
     {
         public string Name { get; private set; }
-        public ReadOnlyCollection<OutputMemberRole> Roles { get; private set; }
-        public OutputMember(string name, IList<OutputMemberRole> roles)
+        public ReadOnlyCollection<MemberRole> Roles { get; private set; }
+        public Member(string name, IList<MemberRole> roles)
         {
             if ((object)roles != null && roles.Contains(null))
                 throw new ArgumentException("Role list must contains all not null values.", "roles");
             this.Name = name ?? string.Empty;
-            this.Roles = new ReadOnlyCollection<OutputMemberRole>(roles ?? new OutputMemberRole[0]);
+            this.Roles = new ReadOnlyCollection<MemberRole>(roles ?? new MemberRole[0]);
         }
     }
 
@@ -73,17 +73,25 @@ namespace XmlDocConvert
         static InputConsts() { }
     }
 
-    static class Program
+    sealed class XmlDocConverter
     {
+        private readonly Func<string> input;
+        private readonly Action<string> output;
 
-        static IList<InputProject> ReadInputProjects()
+        public XmlDocConverter(Func<string> input, Action<string> output)
         {
-            if (Console.ReadLine() != InputConsts.ProjectsHeader)
+            this.input = input ?? Console.ReadLine;
+            this.output = output ?? Console.WriteLine;
+        }
+
+        public IList<Project> ReadProjects()
+        {
+            if (this.input() != InputConsts.ProjectsHeader)
                 throw new ArgumentException("Projects header was expected.");
 
-            List<InputProject> inputProjects = new List<InputProject>();
+            List<Project> inputProjects = new List<Project>();
             string projectHeader;
-            while ((projectHeader = Console.ReadLine()) != InputConsts.ProjectsTail)
+            while ((projectHeader = this.input()) != InputConsts.ProjectsTail)
             {
                 if (!(
                     projectHeader.Length >= InputConsts.ProjectHeaderMinLength &&
@@ -97,9 +105,9 @@ namespace XmlDocConvert
                     projectHeader.Length - (InputConsts.ProjectHeaderStart.Length + InputConsts.ProjectHeaderEnd.Length)
                 );
 
-                List<InputProjectMember> projectMembers = new List<InputProjectMember>();
+                List<ProjectMember> projectMembers = new List<ProjectMember>();
                 string memberLine;
-                while ((memberLine = Console.ReadLine()) != InputConsts.ProjectTail)
+                while ((memberLine = this.input()) != InputConsts.ProjectTail)
                 {
                     if (!(
                         memberLine.Length >= InputConsts.ProjectMemberMinLength &&
@@ -121,25 +129,25 @@ namespace XmlDocConvert
                         memberLine.Length - (indexOfProjectMemberNameStart + InputConsts.ProjectMemberNameStart.Length + InputConsts.ProjectMemberEnd.Length)
                     );
 
-                    projectMembers.Add(new InputProjectMember(memberRole, memberName));
+                    projectMembers.Add(new ProjectMember(memberRole, memberName));
                 } // while (member list)
 
-                inputProjects.Add(new InputProject(projectName, projectMembers));
+                inputProjects.Add(new Project(projectName, projectMembers));
             } // while (project list)
 
             return inputProjects;
         }
 
-        static void OutputProjects(IList<InputProject> projects)
+        public void WriteProjects(IList<Project> projects)
         {
-            Console.WriteLine(InputConsts.ProjectsHeader);
+            this.output(InputConsts.ProjectsHeader);
 
             for (int i = 0; i < projects.Count; i++)
             {
-                Console.WriteLine(InputConsts.ProjectHeaderStart + projects[i].Name + InputConsts.ProjectHeaderEnd);
+                this.output(InputConsts.ProjectHeaderStart + projects[i].Name + InputConsts.ProjectHeaderEnd);
                 for (int j = 0; j < projects[i].Members.Count; j++)
                 {
-                    Console.WriteLine(
+                    this.output(
                         InputConsts.ProjectMemberStart +
                         projects[i].Members[j].Role +
                         InputConsts.ProjectMemberNameStart +
@@ -147,18 +155,21 @@ namespace XmlDocConvert
                         InputConsts.ProjectMemberEnd
                     );
                 }
-                Console.WriteLine(InputConsts.ProjectTail);
+                this.output(InputConsts.ProjectTail);
             }
 
-            Console.WriteLine(InputConsts.ProjectsTail);
+            this.output(InputConsts.ProjectsTail);
         }
+    }
 
+    static class Program
+    {
         static void Main(string[] args)
         {
-            IList<InputProject> inputProjects = ReadInputProjects();
+            XmlDocConverter converter = new XmlDocConverter(null, null);
+            IList<Project> inputProjects = converter.ReadProjects();
 
-            //OutputProjects(inputProjects);
-
+            //converter.WriteProjects(inputProjects);
             //Console.ReadLine();
         }
     }
