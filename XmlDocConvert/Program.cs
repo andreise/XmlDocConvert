@@ -220,8 +220,8 @@ namespace XmlDocConvert
                         memberRoles.Add(memberRole);
                     }
                 memberRoles = memberRoles
-                    .OrderBy(memberRole => memberRole.Name, this.nameComparer)
-                    .ThenBy(memberRole => memberRole.Project, this.nameComparer)
+                    .OrderBy(memberRole => memberRole.Project, this.nameComparer)
+                    .ThenBy(memberRole => memberRole.Name, this.nameComparer)
                     .ToList();
                 yield return new Member(memberName, memberRoles);
             }
